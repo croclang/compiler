@@ -30,10 +30,22 @@ int main(int argc, char** argv) {
         memset(expression, 0, sizeof(Node));
         
         char* contents_it = contents;
-        Error err = parse_expr(context, contents, &contents_it, expression);
+        
+        for (;;) {
+            Error err = parse_expr(context, contents_it, &contents_it, expression);
 
-        node_add_child(program, expression);
-        print_error(err);
+            if (!(*contents_it)) {
+                break;
+            }
+
+            if (err.type != ERROR_NONE) {
+                print_error(err);
+
+                break;
+            }
+
+            node_add_child(program, expression);
+        }
 
         print_node(program, 0);
         putchar('\n');

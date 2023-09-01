@@ -1,9 +1,20 @@
+; variable declaration
 a : integer = 69
+; variable re-assignment
 a := 420
 
+; variable declaration and re-assignment
+; when a variable is not initialized, it is 0
 b : integer
 b := 42
 
-defun foo (a:integer, b:integer):integer {
+; catch an error here for variable re-definition
+b : integer
 
+; a function with 2 integer arguments that returns an integer
+defun foo (a:integer, b:integer):integer {
+    ; how to return??
 }
+
+; a function call
+foo(20, 34)

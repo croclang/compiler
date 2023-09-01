@@ -7,11 +7,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+const char* comment_delimiters = ";#";
 const char* whitespace = " \r\n";
 const char* delimiters = " \r\n,():";
 
-void print_token(Token t) {
-    printf("%.*s", t.end - t.beginning, t.beginning);
+int comment_at_beginning(Token token) {
+    const char* comment_it = comment_delimiters;
+
+    while (*comment_it) {
+        if (*(token.beginning) == *comment_it) {
+            return 1;
+        }
+
+        comment_it++;
+    }
+
+    return 0;
 }
 
 Error lex(char* source, Token* token) {
@@ -26,6 +37,23 @@ Error lex(char* source, Token* token) {
     token->beginning = source;
     token->beginning += strspn(token->beginning, whitespace);
     token->end = token->beginning;
+
+    if (*(token->end) == '\0') {
+        return err;
+    }
+
+    while (comment_at_beginning(*token)) {
+        token->beginning = strpbrk(token->beginning, "\n");
+
+        if (!token->beginning) {
+            token->end = token->beginning;
+
+            return err;
+        }
+
+        token->beginning += strspn(token->beginning, whitespace);
+        token->end = token->beginning;
+    }
 
     if (*(token->end) == '\0') {
         return err;
@@ -57,6 +85,14 @@ int token_string_equalp(char* string, Token* token) {
     }
 
     return 1;
+}
+
+void print_token(Token t) {
+    if (t.end - t.beginning < 1) {
+        printf("print_token: invalid token pointers");
+    } else {
+        printf("%.*s", t.end - t.beginning, t.beginning);
+    }
 }
 
 Node* node_allocate() {
@@ -246,6 +282,48 @@ void print_node(Node* node, size_t indent_level) {
     }
 }
 
+// Copy `a` into `b`
+void node_copy(Node* a, Node* b) {
+    if (!a || !b) {
+        return;
+    }
+
+    b->type = a->type;
+
+    switch (a->type) {
+    default:
+        b->value = a->value;
+
+        break;
+
+    case NODE_TYPE_SYMBOL:
+        b->value.symbol = strdup(a->value.symbol);
+
+        assert(b->value.symbol && "node_copy: could not allocate memory for new symbol");
+
+        break;
+    }
+
+    Node* child = a->children;
+    Node* child_it = NULL;
+
+    while (child) {
+        Node* new_child = node_allocate();
+
+        if (child_it) {
+            child_it->next_child = new_child;
+            child_it = child_it->next_child;
+        } else {
+            b->children = new_child;
+            child_it = new_child;
+        }
+
+        node_copy(child, child_it);
+
+        child = child->next_child;
+    }
+}
+
 ParsingContext* parse_context_create() {
     ParsingContext* ctx = calloc(1, sizeof(ParsingContext));
     assert(ctx && "parse_context_create: could not allocate memory for parsing context");
@@ -311,6 +389,7 @@ void node_free(Node* root) {
 
 Error parse_expr(ParsingContext* context, char* source, char** end, Node* result) {
     size_t token_count = 0;
+    size_t token_length = 0;
     Token current_token;
     current_token.beginning = source;
     current_token.end = source;
@@ -319,86 +398,158 @@ Error parse_expr(ParsingContext* context, char* source, char** end, Node* result
 
     while ((err = lex(current_token.end, &current_token)).type == ERROR_NONE) {
         *end = current_token.end;
-        size_t token_length = current_token.end - current_token.beginning;
+        token_length = current_token.end - current_token.beginning;
 
         if (token_length == 0) {
             break;
         }
 
         if (parse_integer(&current_token, result)) {
-            Node lhs_integer = *result;
+            return ok;
+        }
+
+        Node* symbol = node_symbol_from_buffer(current_token.beginning, token_length);
+        err = lex(current_token.end, &current_token);
+        *end = current_token.end;
+
+        if (err.type != ERROR_NONE) {
+            return err;
+        }
+
+        token_length = current_token.end - current_token.beginning;
+
+        if (token_length == 0) {
+            break;
+        }
+
+        if (token_string_equalp(":", &current_token)) {
             err = lex(current_token.end, &current_token);
+            *end = current_token.end;
 
             if (err.type != ERROR_NONE) {
                 return err;
             }
 
-            *end = current_token.end;
-        } else {
-            Node* symbol = node_symbol_from_buffer(current_token.beginning, token_length);
-            err = lex(current_token.end, &current_token);
-
-            if (err.type != ERROR_NONE) {
-                return err;
-            }
-
-            *end = current_token.end;
-            size_t token_length = current_token.end - current_token.beginning;
+            token_length = current_token.end - current_token.beginning;
 
             if (token_length == 0) {
                 break;
             }
 
-            if (token_string_equalp(":", &current_token)) {
-                err = lex(current_token.end, &current_token);
+            Node* variable_binding = node_allocate();
+
+            printf("looking for \"%s\" in variables environment\n", symbol->value.symbol);
+            if (environment_get(*context->variables, symbol, variable_binding)) {
+                printf("found existing symbol in environment: %s\n", symbol->value.symbol);
+
+                if (token_string_equalp("=", &current_token)) {
+                    Node* reassign_expr = node_allocate();
+                    err = parse_expr(context, current_token.end, end, reassign_expr);
+
+                    if (err.type != ERROR_NONE) {
+                        return err;
+                    }
+
+                    printf("reassign expr: ");
+                    print_node(reassign_expr, 0);
+                    putchar('\n');
+
+                    exit(0);
+
+                    if (reassign_expr->type != variable_binding->children->type) {
+                        ERROR_PREP(err, ERROR_TYPE, "variable assignment expression has mismatched type");
+
+                        return err;
+                    }
+
+                    variable_binding->children->value = reassign_expr->value;
+
+                    free(reassign_expr);
+
+                    return ok;
+                }
+
+                printf("id of redefined variable: \"%s\"", symbol->value.symbol);
+                ERROR_PREP(err, ERROR_GENERIC, "redefinition of variable");
+
+                return err;
+            }
+
+            free(variable_binding);
+
+            Node* expected_type_symbol = node_symbol_from_buffer(current_token.beginning, token_length);
+            if (environment_get(*context->types, expected_type_symbol, result) == 0) {
+                ERROR_PREP(err, ERROR_TYPE, "invalid type within variable declaration");
+                printf("\ninvalid type: \"%s\"\n", expected_type_symbol->value.symbol);
+
+                return err;
+            }
+
+            printf("valid type symbol: \"%s\"\n", expected_type_symbol->value.symbol);
+
+            Node* var_decl = node_allocate();
+            var_decl->type = NODE_TYPE_VARIABLE_DECLARATION;
+
+            Node* type_node = node_allocate();
+            type_node->type = result->type;
+
+            node_add_child(var_decl, symbol);
+
+            err = lex(current_token.end, &current_token);
+            *end = current_token.end;
+
+            if (err.type != ERROR_NONE) {
+                return err;
+            }
+
+            token_length = current_token.end - current_token.beginning;
+
+            if (token_length == 0) {
+                break;
+            }
+
+            if (token_string_equalp("=", &current_token)) {
+                Node* assigned_expr = node_allocate();
+                err = parse_expr(context, current_token.end, end, assigned_expr);
 
                 if (err.type != ERROR_NONE) {
                     return err;
                 }
 
-                *end = current_token.end;
-                size_t token_length = current_token.end - current_token.beginning;
+                printf("assigned expr: ");
+                print_node(assigned_expr, 0);
+                putchar('\n');
 
-                if (token_length == 0) {
-                    break;
-                }
-
-                Node* expected_symbol_type = node_symbol_from_buffer(current_token.beginning, token_length);
-                int status = environment_get(*context->types, expected_symbol_type, result);
-
-                if (status == 0) {
-                    ERROR_PREP(err, ERROR_TYPE, "invalid type within variable declaration");
-                    printf("\ninvalid type: \"%s\"\n", expected_symbol_type->value.symbol);
+                if (assigned_expr->type != type_node->type) {
+                    node_free(assigned_expr);
+                    ERROR_PREP(err, ERROR_TYPE, "variable assignment expression has mismatched type");
 
                     return err;
-                } else {
-                    Node* var_decl = node_allocate();
-                    var_decl->type = NODE_TYPE_VARIABLE_DECLARATION;
-
-                    Node* type_node = node_allocate();
-                    type_node->type = result->type;
-
-                    node_add_child(var_decl, type_node);
-                    node_add_child(var_decl, symbol);
-
-                    *result = *var_decl;
-
-                    free(var_decl);
-
-                    return ok;
                 }
+
+                type_node->value = assigned_expr->value;
+
+                free(assigned_expr);
             }
 
-            printf("unrecognized token: ");
-            print_token(current_token);
-            putchar('\n');
+            *result = *var_decl;
+            free(var_decl);
 
-            return err;
+            Node* symbol_for_env = node_allocate();
+            node_copy(symbol, symbol_for_env);
+
+            int status = environment_set(context->variables, symbol_for_env, type_node);
+
+            return ok;
         }
 
-        printf("intermediate node: ");
-        print_node(result, 0);
+        printf("unrecognized token: ");
+        print_token(current_token);
         putchar('\n');
+
+        ERROR_PREP(err, ERROR_SYNTAX, "unrecognized token reached during parsing");
+
+        return err;
     }
 
     return err;
