@@ -38,6 +38,8 @@ char* file_contents(char* path) {
 
     long size = file_size(file);
     char* contents = malloc(size + 1);
+    assert(contents && "file_contents: could not allocate memory for buffer");
+
     char* write_it = contents;
     size_t bytes_read = 0;
 
@@ -139,50 +141,10 @@ const char* delimiters = " \r\n,():";
 typedef struct Token {
     char* beginning;
     char* end;
-    struct Token* next;
 } Token;
-
-Token* token_create() {
-    Token* token = malloc(sizeof(Token));
-
-    assert(token && "token_create: failed to allocate memory for token");
-    memset(token, 0, sizeof(Token));
-
-    return token;
-}
-
-void token_free(Token* root) {
-    while (root) {
-        Token* token_to_free = root;
-        root = root->next;
-
-        free(token_to_free);
-    }
-}
 
 void print_token(Token t) {
     printf("%.*s", t.end - t.beginning, t.beginning);
-}
-
-void print_tokens(Token* root) {
-    size_t count = 1;
-
-    while (root) {
-        if (count > 10000) {
-            break;
-        }
-
-        printf("token %zu: ", count);
-        
-        if (root->beginning && root->end) {
-            printf("%.*s", root->end - root->beginning, root->beginning);
-        }
-
-        putchar('\n');
-
-        root = root->next;
-        count++;
-    }
 }
 
 Error lex(char* source, Token* token) {
@@ -211,20 +173,21 @@ Error lex(char* source, Token* token) {
     return err;
 }
 
-// TODO
-// |-- API to create new Node
-// `-- API to add Node as child
-typedef long long integer_t;
 typedef struct Node {
     enum NodeType {
         NODE_TYPE_NONE,
         NODE_TYPE_INTEGER,
+        NODE_TYPE_SYMBOL,
+        NODE_TYPE_VARIABLE_DECLARATION,
+        NODE_TYPE_VARIABLE_DECLARATION_INITIALIZED,
+        NODE_TYPE_BINARY_OPERATOR,
         NODE_TYPE_PROGRAM,
         NODE_TYPE_MAX,
     } type;
 
     union NodeValue {
-        integer_t integer;
+        long long integer;
+        char* symbol;
     } value;
 
     struct Node* children;
@@ -233,6 +196,30 @@ typedef struct Node {
 
 #define nonep(node)     ((node).type == NODE_TYPE_NONE)
 #define integerp(node)  ((node).type == NODE_TYPE_INTEGER)
+#define symbolp(node)   ((node).type == NODE_TYPE_SYMBOL)
+
+void node_add_child(Node* parent, Node* new_child) {
+    if (!parent || !new_child) {
+        return;
+    }
+
+    Node* allocated_child = malloc(sizeof(Node));
+    assert(allocated_child && "node_add_child: could not allocate memory for child node");
+    
+    *allocated_child = *new_child;
+
+    if (parent->children) {
+        Node* child = parent->children;
+
+        while (child->next_child) {
+            child = child->next_child;
+        }
+
+        child->next_child = allocated_child;
+    } else {
+        parent->children = allocated_child;
+    }
+}
 
 int node_compare(Node* a, Node* b) {
     if (!a || !b) {
@@ -282,9 +269,14 @@ void print_node(Node* node, size_t indent_level) {
         putchar(' ');
     }
 
-    assert(NODE_TYPE_MAX == 3 && "print_node: print_node() does not handle all node types");
+    assert(NODE_TYPE_MAX == 7 && "print_node: print_node() does not handle all node types");
 
     switch (node->type) {
+    default:
+        printf("UNKNOWN");
+
+        break;
+
     case NODE_TYPE_NONE:
         printf("NONE");
 
@@ -294,17 +286,36 @@ void print_node(Node* node, size_t indent_level) {
         printf("INT:%lld", node->value.integer);
 
         break;
-    
-    case NODE_TYPE_PROGRAM:
-        printf("PROGRAM");
+
+    case NODE_TYPE_SYMBOL:
+        printf("SYM");
+
+        if (node->value.symbol) {
+            printf(":%s", node->value.symbol);
+        }
+
+        break;
+
+    case NODE_TYPE_BINARY_OPERATOR:
+        printf("TODO: print_node() binary operator");
 
         break;
     
-    default:
-        printf("UNKNOWN");
+    case NODE_TYPE_VARIABLE_DECLARATION:
+        printf("VARIABLE DECLARATION");
+
+        break;
+
+    case NODE_TYPE_VARIABLE_DECLARATION_INITIALIZED:
+        printf("TODO: print_node() variable decl initialized");
+    
+    case NODE_TYPE_PROGRAM:
+        printf("TODO: print_node() program");
 
         break;
     }
+
+    putchar('\n');
 
     Node* child = node->children;
 
@@ -331,6 +342,10 @@ void node_free(Node* root) {
         node_free(child);
 
         child = next_child;
+    }
+
+    if (symbolp(*root) && root->value.symbol) {
+        free(root->value.symbol);
     }
 
     free(root);
@@ -428,10 +443,16 @@ int parse_integer(Token* token, Node* node) {
         return 0;
     }
 
+    char* end = NULL;
+
     if (token->end - token->beginning == 1 && *(token->beginning) == '0') {
         node->type = NODE_TYPE_INTEGER;
         node->value.integer = 0;
-    } else if ((node->value.integer = strtoll(token->beginning, NULL, 10)) != 0) {
+    } else if ((node->value.integer = strtoll(token->beginning, &end, 10)) != 0) {
+        if (end != token->end) {
+            return 0;
+        }
+
         node->type = NODE_TYPE_INTEGER;
     } else {
         return 0;
@@ -440,50 +461,102 @@ int parse_integer(Token* token, Node* node) {
     return 1;
 }
 
-Error parse_expr(char* source, Node* result) {
+Error parse_expr(char* source, char** end, Node* result) {
     size_t token_count = 0;
     Token current_token;
-    current_token.next = NULL;
     current_token.beginning = source;
     current_token.end = source;
 
     Error err = ok;
-    Node* root = calloc(1, sizeof(Node));
-
-    assert(root && "parse_expr: could not allocate memory for AST root");
-    root->type = NODE_TYPE_PROGRAM;
-    
-    Node working_node;
 
     while ((err = lex(current_token.end, &current_token)).type == ERROR_NONE) {
-        working_node.children = NULL;
-        working_node.next_child = NULL;
-        working_node.type = NODE_TYPE_NONE;
-        working_node.value.integer = 0;
-        
+        *end = current_token.end;
         size_t token_length = current_token.end - current_token.beginning;
 
         if (token_length == 0) {
             break;
         }
 
-        if (parse_integer(&current_token, &working_node)) {
-            Token integer;
-            memcpy(&integer, &current_token, sizeof(Token));
+        if (parse_integer(&current_token, result)) {
+            Node lhs_integer = *result;
+            err = lex(current_token.end, &current_token);
+
+            if (err.type != ERROR_NONE) {
+                return err;
+            }
+
+            *end = current_token.end;
+        } else {
+            Node symbol;
+            symbol.type = NODE_TYPE_SYMBOL;
+            symbol.children = NULL;
+            symbol.next_child = NULL;
+            symbol.value.symbol = NULL;
+
+            char* symbol_string = malloc(token_length + 1);
+            assert(symbol_string && "parse_expr: could not allocate memory for symbol");
+
+            memcpy(symbol_string, current_token.beginning, token_length);
+
+            symbol_string[token_length] = '\0';
+            symbol.value.symbol = symbol_string;
+            *result = symbol;
 
             err = lex(current_token.end, &current_token);
 
             if (err.type != ERROR_NONE) {
                 return err;
             }
-        } else {
+
+            *end = current_token.end;
+            size_t token_length = current_token.end - current_token.beginning;
+
+            if (token_length == 0) {
+                break;
+            }
+
+            if (token_string_equalp(":", &current_token)) {
+                err = lex(current_token.end, &current_token);
+
+                if (err.type != ERROR_NONE) {
+                    return err;
+                }
+
+                *end = current_token.end;
+                size_t token_length = current_token.end - current_token.beginning;
+
+                if (token_length == 0) {
+                    break;
+                }
+
+                if (token_string_equalp("integer", &current_token)) {
+                    Node var_decl;
+                    var_decl.children = NULL;
+                    var_decl.next_child = NULL;
+                    var_decl.type = NODE_TYPE_VARIABLE_DECLARATION;
+
+                    Node type_node;
+                    memset(&type_node, 0, sizeof(Node));
+                    type_node.type = NODE_TYPE_INTEGER;
+
+                    node_add_child(&var_decl, &type_node);
+                    node_add_child(&var_decl, &symbol);
+
+                    *result = var_decl;
+
+                    return ok;
+                }
+            }
+
             printf("unrecognized token: ");
             print_token(current_token);
             putchar('\n');
+
+            return err;
         }
 
-        printf("found node: ");
-        print_node(&working_node, 0);
+        printf("intermediate node: ");
+        print_node(result, 0);
         putchar('\n');
     }
 
@@ -501,7 +574,13 @@ int main(int argc, char** argv) {
 
     if (contents) {
         Node expression;
-        Error err = parse_expr(contents, &expression);
+        memset(&expression, 0, sizeof(Node));
+        
+        char* contents_it = contents;
+        Error err = parse_expr(contents, &contents_it, &expression);
+
+        print_node(&expression, 0);
+        putchar('\n');
 
         print_error(err);
         free(contents);
