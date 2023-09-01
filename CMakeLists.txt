@@ -9,5 +9,14 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 17)
 
+set(SOURCES
+    src/error.c
+    src/environment.c
+    src/file_io.c
+    src/main.c
+    src/parser.c)
+
 project(croc)
-add_executable(croc src/main.c)
+add_executable(croc ${SOURCES})
+
+target_include_directories(croc PUBLIC src/)
