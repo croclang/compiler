@@ -1,11 +1,12 @@
 #include "file_io.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 
-long file_size(FILE* file) {
+size_t file_size(FILE* file) {
     if (!file) {
         return 0;
     }
@@ -37,7 +38,7 @@ char* file_contents(char* path) {
         return NULL;
     }
 
-    long size = file_size(file);
+    size_t size = file_size(file);
     char* contents = malloc(size + 1);
     assert(contents && "file_contents: could not allocate memory for buffer");
 

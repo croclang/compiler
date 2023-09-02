@@ -12,9 +12,15 @@ b := 42
 ;b : integer
 
 ; a function with 2 integer arguments that returns an integer
-;defun foo (a:integer, b:integer):integer {
-;    a + b
-;}
+defun foo (c:integer, b:integer):integer {
+    c := 10
+    c := 5
+    c := 42
+    c := 69
+    c := 420
+    c := 69
+}
 
 ; a function call
-;foo(20, 34)
+; FIXME: make this work
+foo(20, 34)

@@ -9,6 +9,9 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 17)
 
+# add_compile_options(-fsanitize=address)
+# add_link_options(-fsanitize=address)
+
 set(SOURCES
     src/codegen.c
     src/error.c

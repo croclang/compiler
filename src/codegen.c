@@ -114,9 +114,9 @@ Error codegen_program_x86_64_att_asm(ParsingContext* context, Node* program) {
     fwrite_line("_start:", code);
     fwrite_line("push %rbp", code);
     fwrite_line("mov %rsp, %rbp", code);
+    fwrite_line("sub $32, %rsp", code);
 
     Node* expression = program->children;
-    Node* tmpnode1 = node_allocate();
 
     while (expression) {
         switch (expression->type) {
@@ -139,6 +139,7 @@ Error codegen_program_x86_64_att_asm(ParsingContext* context, Node* program) {
         expression = expression->next_child;
     }
 
+    fwrite_line("add $32, %rsp", code);
     fwrite_line("movq (%rax), %rax", code);
     fwrite_line("pop %rbp", code);
     fwrite_line("ret", code);

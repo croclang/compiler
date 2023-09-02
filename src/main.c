@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 
     if (contents) {
         Error err = ok;
-        ParsingContext* context = parse_context_create();
+        ParsingContext* context = parse_context_default_create();
         Node* program = node_allocate();
         program->type = NODE_TYPE_PROGRAM;
 

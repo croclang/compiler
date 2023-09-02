@@ -18,6 +18,8 @@ typedef enum NodeType {
     NODE_TYPE_NONE = 0,
     NODE_TYPE_INTEGER,
     NODE_TYPE_SYMBOL,
+    NODE_TYPE_FUNCTION,
+    NODE_TYPE_FUNCTION_CALL,
     NODE_TYPE_VARIABLE_DECLARATION,
     NODE_TYPE_VARIABLE_DECLARATION_INITIALIZED,
     NODE_TYPE_VARIABLE_REASSIGNMENT,
@@ -57,12 +59,28 @@ void node_copy(Node* a, Node* b);
 int token_string_equalp(char* string, Token* token);
 int parse_integer(Token* token, Node* node);
 
+typedef struct ParsingStack {
+    struct ParsingStack* parent;
+    Node* operator;
+    Node* result;
+} ParsingStack;
+
 typedef struct ParsingContext {
+    struct ParsingContext* parent;
+    Node* operator;
+    Node* result;
+
     Environment* types;
     Environment* variables;
+    Environment* functions;
 } ParsingContext;
 
-ParsingContext* parse_context_create();
+Error parse_get_type(ParsingContext* context, Node* id, Node* result);
+
+ParsingContext* parse_context_create(ParsingContext* parent);
+ParsingContext* parse_context_default_create();
+
 Error parse_expr(ParsingContext* context, char* source, char** end, Node* result);
+Error parse_program(char* filepath, ParsingContext* context, Node* result);
 
 #endif
