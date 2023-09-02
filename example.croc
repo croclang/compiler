@@ -12,9 +12,9 @@ b := 42
 ;b : integer
 
 ; a function with 2 integer arguments that returns an integer
-defun foo (a:integer, b:integer):integer {
-    a + b
-}
+;defun foo (a:integer, b:integer):integer {
+;    a + b
+;}
 
 ; a function call
-foo(20, 34)
+;foo(20, 34)
