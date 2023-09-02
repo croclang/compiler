@@ -9,11 +9,11 @@ b : integer
 b := 42
 
 ; catch an error here for variable re-definition
-b : integer
+;b : integer
 
 ; a function with 2 integer arguments that returns an integer
 defun foo (a:integer, b:integer):integer {
-    ; how to return??
+    a + b
 }
 
 ; a function call

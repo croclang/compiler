@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 17)
 
 set(SOURCES
+    src/codegen.c
     src/error.c
     src/environment.c
     src/file_io.c

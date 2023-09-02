@@ -14,17 +14,20 @@ typedef struct Token {
 void print_token(Token t);
 Error lex(char* source, Token* token);
 
+typedef enum NodeType {
+    NODE_TYPE_NONE = 0,
+    NODE_TYPE_INTEGER,
+    NODE_TYPE_SYMBOL,
+    NODE_TYPE_VARIABLE_DECLARATION,
+    NODE_TYPE_VARIABLE_DECLARATION_INITIALIZED,
+    NODE_TYPE_VARIABLE_REASSIGNMENT,
+    NODE_TYPE_BINARY_OPERATOR,
+    NODE_TYPE_PROGRAM,
+    NODE_TYPE_MAX,
+} NodeType;
+
 typedef struct Node {
-    enum NodeType {
-        NODE_TYPE_NONE,
-        NODE_TYPE_INTEGER,
-        NODE_TYPE_SYMBOL,
-        NODE_TYPE_VARIABLE_DECLARATION,
-        NODE_TYPE_VARIABLE_DECLARATION_INITIALIZED,
-        NODE_TYPE_BINARY_OPERATOR,
-        NODE_TYPE_PROGRAM,
-        NODE_TYPE_MAX,
-    } type;
+    int type;
 
     union NodeValue {
         long long integer;
@@ -49,6 +52,7 @@ Node* node_symbol_from_buffer(char* buffer, size_t length);
 
 void print_node(Node* node, size_t indent_level);
 void node_free(Node* root);
+void node_copy(Node* a, Node* b);
 
 int token_string_equalp(char* string, Token* token);
 int parse_integer(Token* token, Node* node);
