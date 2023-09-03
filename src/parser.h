@@ -38,6 +38,7 @@ typedef struct Node {
 
     struct Node* children;
     struct Node* next_child;
+    int result_register;
 } Node;
 
 Node* node_allocate();

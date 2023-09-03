@@ -24,3 +24,9 @@ defun foo (c:integer, b:integer):integer {
 ; a function call
 ; FIXME: make this work
 foo(20, 34)
+
+; lambda syntax
+;[(a:integer) {a := 25 a}]
+
+; function assignment
+;foo : function = [(x:integer) {x}]
