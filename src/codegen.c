@@ -233,7 +233,7 @@ Error codegen_function_x86_64_att_mswin(Register* r, CodegenContext* cg_context,
     }
 
     fprintf(code, "jmp after%s\n", name);
-    fprintf(code, "%s\n", name);
+    fprintf(code, "%s:\n", name);
     fprintf(code, "%s", function_header_x86_64);
 
     Node* expression = function->children->next_child->next_child->children;
