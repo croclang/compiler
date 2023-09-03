@@ -9,7 +9,7 @@ b : integer
 b := 42
 
 ; catch an error here for variable re-definition
-;b : integer
+b : integer
 
 ; a function with 2 integer arguments that returns an integer
 defun foo (c:integer, b:integer):integer {
@@ -26,7 +26,12 @@ defun foo (c:integer, b:integer):integer {
 foo(20, 34)
 
 ; lambda syntax
-;[(a:integer) {a := 25 a}]
+; [return-type (param:type) {body}]
+;[integer (a:integer) {a := 25 a}]
 
 ; function assignment
-;foo : function = [(x:integer) {x}]
+; function-name : function = lambda
+;foo : function = [integer (x:integer) {x}]
+
+; support this aswell maybe
+;baz : [integer (x:integer) {x}]

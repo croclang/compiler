@@ -5,9 +5,10 @@
 
 #include "codegen.h"
 #include "error.h"
-#include "file_io.h"
 #include "environment.h"
+#include "file_io.h"
 #include "parser.h"
+#include "typechecker.h"
 
 void print_usage(char** argv) {
     printf("Usage: %s <file.croc>\n", argv[0]);
@@ -16,7 +17,7 @@ void print_usage(char** argv) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         print_usage(argv);
-        
+
         return 0;
     }
 
@@ -33,11 +34,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    err = codegen_program(CG_FMT_DEFAULT, context, program);
+    err = typecheck_program(context, program);
     if (err.type) {
         print_error(err);
 
         return 2;
+    }
+
+    err = codegen_program(CG_FMT_DEFAULT, context, program);
+    if (err.type) {
+        print_error(err);
+
+        return 3;
     }
 
     node_free(program);

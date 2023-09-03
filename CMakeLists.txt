@@ -18,7 +18,8 @@ set(SOURCES
     src/environment.c
     src/file_io.c
     src/main.c
-    src/parser.c)
+    src/parser.c
+    src/typechecker.c)
 
 project(croc)
 add_executable(croc ${SOURCES})

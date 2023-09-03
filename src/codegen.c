@@ -16,6 +16,16 @@ CodegenContext* codegen_context_create(CodegenContext* parent) {
     return cg_ctx;
 }
 
+void print_registers(Register* base) {
+    Register* it = base;
+
+    while (it) {
+        printf("%s:%i\n", it->name, it->in_use);
+        
+        it = it->next;
+    }
+}
+
 Register* register_create(char* name) {
     Register* r = calloc(1, sizeof(Register));
     assert(r && "register_create: failed to allocate memory for new register");
@@ -88,13 +98,12 @@ void register_deallocate(Register* base, RegisterDescriptor register_descriptor)
 
 char* register_name(Register* base, RegisterDescriptor register_descriptor) {
     while (base) {
-        register_descriptor--;
-
         if (register_descriptor <= 0) {
             return base->name;
         }
 
         base = base->next;
+        register_descriptor--;
     }
 
     printf("register_name: ERROR - failed to find register with descriptor of %d\n", register_descriptor);
@@ -185,7 +194,7 @@ Error codegen_expression_x86_64_mswin(FILE* code, Register* r, CodegenContext* c
                 if (!result) {
                     ERROR_PREP(err, ERROR_GENERIC, "failed to allocate integer result buffer");
 
-                    return err;
+                    break;
                 }
 
                 snprintf(result, 64, "$%lld", expression->children->next_child->value.integer);
@@ -242,7 +251,7 @@ Error codegen_function_x86_64_att_mswin(Register* r, CodegenContext* cg_context,
         if (err.type) {
             print_error(err);
 
-            return err;
+            break;
         }
 
         expression = expression->next_child;
@@ -296,14 +305,20 @@ Error codegen_program_x86_64_mswin(FILE* code, CodegenContext* cg_context, Parsi
         "main:\n"
         "%s", function_header_x86_64);
 
+    Node* last_expression = program->children;
     Node* expression = program->children;
     while (expression) {
         codegen_expression_x86_64_mswin(code, r, cg_context, context, expression);
         
+        last_expression = expression;
         expression = expression->next_child;
     }
 
-    fprintf(code, "mov $0, %%rax\n");
+    char* name = register_name(r, last_expression->result_register);
+    if (strcmp(name, "%rax")) {
+        fprintf(code, "mov $0, %%rax\n");
+    }
+
     fprintf(code, "%s", function_footer_x86_64);
 
     return ok;

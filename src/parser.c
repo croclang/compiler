@@ -242,7 +242,7 @@ Node* node_symbol_from_buffer(char* buffer, size_t length) {
 }
 
 // Take owner of type symbol
-Error node_add_type(Environment* types, int type, Node* type_symbol, long long byte_size) {
+Error define_type(Environment* types, int type, Node* type_symbol, long long byte_size) {
     assert(types && "node_add_type: cannot add type to NULL types environment");
     assert(type_symbol && "node_add_type: cannot add NULL type symbol to types environment");
     assert(byte_size >= 0 && "node_add_type: cannot define new type with zero or negative byte size");
@@ -404,7 +404,7 @@ ParsingContext* parse_context_create(ParsingContext* parent) {
 
 ParsingContext* parse_context_default_create() {
     ParsingContext* ctx = parse_context_create(NULL);
-    Error err = node_add_type(ctx->types, NODE_TYPE_INTEGER, node_symbol("integer"), sizeof(long long));
+    Error err = define_type(ctx->types, NODE_TYPE_INTEGER, node_symbol("integer"), sizeof(long long));
 
     if (err.type != ERROR_NONE) {
         printf("ERROR: failed to set builtin integer type in types environment\n");
@@ -652,7 +652,11 @@ Error parse_expr(ParsingContext* context, char* source, char** end, Node* result
                 context->operator = node_symbol("defun");
 
                 Node* param_it = working_result->children->children;
-                environment_set(context->variables, param_it->children, param_it->children->next_child);
+                while (param_it) {
+                    environment_set(context->variables, param_it->children, param_it->children->next_child);
+
+                    param_it = param_it->next_child;
+                }
 
                 Node* function_body = node_allocate();
                 Node* function_first_expression = node_allocate();
@@ -708,8 +712,8 @@ Error parse_expr(ParsingContext* context, char* source, char** end, Node* result
 
                     Node* variable_binding = node_allocate();
                     if (environment_get(*context->variables, symbol, variable_binding)) {
-                        printf("id of redefined variable: \"%s\"\n", symbol->value.symbol);
                         ERROR_PREP(err, ERROR_GENERIC, "redefinition of variable");
+                        printf("id of redefined variable: \"%s\"\n", symbol->value.symbol);
 
                         return err;
                     }
