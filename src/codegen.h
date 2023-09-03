@@ -1,14 +1,37 @@
 #ifndef COMPILER_CODEGEN_H
 #define COMPILER_CODEGEN_H
 
+#include "environment.h"
 #include "error.h"
 #include "parser.h"
 
-typedef enum CodegenOutputFormat {
-    OUTPUT_FMT_DEFAULT = 0,
-    OUTPUT_FMT_x86_64_AT_T_ASM,
-} CodegenOutputFormat;
+typedef int RegisterDescriptor;
+typedef struct Register {
+    struct Register* next;
+    char* name;
+    char in_use;
+} Register;
 
-Error codegen_program(CodegenOutputFormat, ParsingContext* context, Node* program);
+Register* register_create(char* name);
+void register_add(Register* base, char* name);
+void register_free(Register* base);
+
+RegisterDescriptor register_allocate(Register* base);
+void register_deallocate(Register* base, RegisterDescriptor register_descriptor);
+
+char* register_name();
+char* label_generate();
+
+typedef struct CodegenContext {
+    struct CodegenContext* parent;
+    Environment* locals;
+} CodegenContext;
+
+enum CodegenOutputFormat {
+    CG_FMT_DEFAULT = 0,
+    CG_FMT_x86_64_MSWIN,
+};
+
+Error codegen_program(enum CodegenOutputFormat, ParsingContext* context, Node* program);
 
 #endif

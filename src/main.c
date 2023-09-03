@@ -33,8 +33,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    err = codegen_program(OUTPUT_FMT_DEFAULT, context, program);
-
+    err = codegen_program(CG_FMT_DEFAULT, context, program);
     if (err.type) {
         print_error(err);
 
